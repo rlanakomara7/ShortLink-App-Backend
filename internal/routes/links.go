@@ -13,4 +13,5 @@ func LinkRoutes(router *gin.Engine, db *pgxpool.Pool, jwtSecret string) {
 	protected.Use(middleware.Auth(jwtSecret))
 
 	protected.POST("/links", handler.CreateLink(db))
+	protected.GET("/links", handler.GetLinks(db))
 }

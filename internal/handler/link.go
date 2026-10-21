@@ -149,3 +149,65 @@ func CreateLink(db *pgxpool.Pool) gin.HandlerFunc {
 		})
 	}
 }
+
+func GetLinks(db *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		userID := c.GetInt64("user_id")
+
+		rows, err := db.Query(
+			c.Request.Context(),
+			`SELECT id, original_url, slug
+			 FROM links
+			 WHERE user_id = $1 AND deleted_at IS NULL
+			 ORDER BY created_at DESC, id DESC`,
+			userID,
+		)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"message": "Failed to get links",
+			})
+			return
+		}
+		defer rows.Close()
+
+		links := []gin.H{}
+
+		for rows.Next() {
+			var id int64
+			var originalURL string
+			var slug string
+
+			if err := rows.Scan(&id, &originalURL, &slug); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"success": false,
+					"message": "Failed to read links",
+				})
+				return
+			}
+
+			links = append(links, gin.H{
+				"id":           id,
+				"original_url": originalURL,
+				"slug":         slug,
+				"short_url":    "http://" + c.Request.Host + "/" + slug,
+			})
+		}
+
+		if err := rows.Err(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"message": "Failed to read links",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "Links retrieved successfully",
+			"results": links,
+		})
+	}
+}

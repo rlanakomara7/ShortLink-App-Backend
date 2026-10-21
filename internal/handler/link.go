@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -208,6 +209,51 @@ func GetLinks(db *pgxpool.Pool) gin.HandlerFunc {
 			"success": true,
 			"message": "Links retrieved successfully",
 			"results": links,
+		})
+	}
+}
+
+func DeleteLink(db *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Convert link ID to integer
+		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+		if err != nil || id < 1 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"message": "Invalid link ID",
+			})
+			return
+		}
+
+		userID := c.GetInt64("user_id")
+
+		result, err := db.Exec(
+			c.Request.Context(),
+			`UPDATE links
+			 SET deleted_at = NOW()
+			 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
+			id, userID,
+		)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"message": "Failed to delete shortlink",
+			})
+			return
+		}
+
+		if result.RowsAffected() == 0 {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"message": "Link not found",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "Shortlink deleted successfully",
 		})
 	}
 }

@@ -14,4 +14,5 @@ func LinkRoutes(router *gin.Engine, db *pgxpool.Pool, jwtSecret string) {
 
 	protected.POST("/links", handler.CreateLink(db))
 	protected.GET("/links", handler.GetLinks(db))
+	protected.DELETE("/links/:id", handler.DeleteLink(db))
 }

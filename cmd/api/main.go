@@ -2,24 +2,30 @@ package main
 
 import (
 	"log"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/rlanakomara7/ShortLink-App-Backend/internal/config"
+	"github.com/rlanakomara7/ShortLink-App-Backend/internal/database"
 )
 
 func main() {
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	db, err := database.Connect(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
 	router := gin.Default()
 
-	router.GET("/healthz", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-			"message": "Shortlink API is running",
-		})
-	})
+	log.Println("Database connected successfully")
 
-	log.Println("Shortlink backend running on port 8080")
-
-	if err := router.Run(":8080"); err != nil {
+	if err := router.Run(":" + cfg.AppPort); err != nil {
 		log.Fatal(err)
 	}
 }

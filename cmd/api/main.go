@@ -7,7 +7,7 @@ import (
 
 	"github.com/rlanakomara7/ShortLink-App-Backend/internal/config"
 	"github.com/rlanakomara7/ShortLink-App-Backend/internal/database"
-	"github.com/rlanakomara7/ShortLink-App-Backend/internal/handler"
+	"github.com/rlanakomara7/ShortLink-App-Backend/internal/routes"
 )
 
 func main() {
@@ -23,8 +23,9 @@ func main() {
 	defer db.Close()
 
 	router := gin.Default()
-	router.POST("/api/register", handler.Register(db))
-	router.POST("/api/login", handler.Login(db, cfg.JWTSecret))
+
+	routes.Setup(router, db, cfg.JWTSecret)
+
 	log.Println("Database connected successfully")
 
 	if err := router.Run(":" + cfg.AppPort); err != nil {

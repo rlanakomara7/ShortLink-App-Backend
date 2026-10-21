@@ -7,6 +7,7 @@ import (
 
 	"github.com/rlanakomara7/ShortLink-App-Backend/internal/config"
 	"github.com/rlanakomara7/ShortLink-App-Backend/internal/database"
+	"github.com/rlanakomara7/ShortLink-App-Backend/internal/handler"
 )
 
 func main() {
@@ -22,6 +23,7 @@ func main() {
 	defer db.Close()
 
 	router := gin.Default()
+	router.POST("/api/register", handler.Register(db))
 
 	log.Println("Database connected successfully")
 

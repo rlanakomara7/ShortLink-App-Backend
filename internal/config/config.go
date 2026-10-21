@@ -15,6 +15,7 @@ type Config struct {
 	DBPassword string
 	DBName     string
 	DBSSLMode  string
+	JWTSecret  string
 }
 
 func Load() (*Config, error) {
@@ -28,10 +29,15 @@ func Load() (*Config, error) {
 		DBPassword: os.Getenv("DB_PASSWORD"),
 		DBName:     getEnv("DB_NAME", "shortlink_db"),
 		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
+		JWTSecret:  os.Getenv("JWT_SECRET"),
 	}
 
 	if cfg.DBPassword == "" {
 		return nil, fmt.Errorf("DB_PASSWORD belum diatur")
+	}
+
+	if len(cfg.JWTSecret) < 32 {
+		return nil, fmt.Errorf("JWT_SECRET must contain at least 32 characters")
 	}
 	return cfg, nil
 }

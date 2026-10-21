@@ -24,7 +24,7 @@ func main() {
 
 	router := gin.Default()
 	router.POST("/api/register", handler.Register(db))
-
+	router.POST("/api/login", handler.Login(db, cfg.JWTSecret))
 	log.Println("Database connected successfully")
 
 	if err := router.Run(":" + cfg.AppPort); err != nil {

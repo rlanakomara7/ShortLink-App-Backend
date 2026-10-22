@@ -30,12 +30,18 @@ func main() {
 		log.Fatal(err)
 	}
 	defer db.Close()
+	log.Println("Database connected successfully")
+
+	redisClient, err := database.ConnectRedis()
+	if err != nil {
+		log.Fatal("Failed to connect Redis :", err)
+	}
+	defer redisClient.Close()
+	log.Println("Connected to Redis")
 
 	router := gin.Default()
 
-	routes.Setup(router, db, cfg.JWTSecret)
-
-	log.Println("Database connected successfully")
+	routes.Setup(router, db, cfg.JWTSecret, redisClient)
 
 	if err := router.Run(":" + cfg.AppPort); err != nil {
 		log.Fatal(err)

@@ -7,9 +7,12 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 type CreateLinkRequest struct {
@@ -295,24 +298,53 @@ func DeleteLink(db *pgxpool.Pool) gin.HandlerFunc {
 // @Success 301 {string} string "Moved Permanently"
 // @Failure 404 {object} map[string]interface{}
 // @Router /{slug} [get]
-func RedirectLink(db *pgxpool.Pool) gin.HandlerFunc {
+
+func RedirectLink(db *pgxpool.Pool, redisClient *redis.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		slug := c.Param("slug")
+		ctx := c.Request.Context()
+		cacheKey := "shortlink:" + slug
 
-		var originalURL string
+		// Check Redis cache
+		originalURL, err := redisClient.Get(ctx, cacheKey).Result()
 
-		err := db.QueryRow(c.Request.Context(),
-			`SELECT original_url FROM links
-			WHERE slug = $1 AND deleted_at IS NULL`,
-			slug).Scan(&originalURL)
+		if err == nil {
+			c.Redirect(http.StatusMovedPermanently, originalURL)
+			return
+		}
 
-		if err != nil {
+		if err != redis.Nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"message": "Cache error",
+			})
+			return
+		}
+
+		// Get original URL from PostgreSQL
+		err = db.QueryRow(
+			ctx,
+			"SELECT original_url FROM links WHERE slug = $1 AND deleted_at IS NULL",
+			slug,
+		).Scan(&originalURL)
+
+		if err == pgx.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{
 				"success": false,
 				"message": "Shortlink not found",
 			})
 			return
 		}
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"message": "Database error",
+			})
+			return
+		}
+
+		redisClient.Set(ctx, cacheKey, originalURL, 10*time.Minute)
 
 		c.Redirect(http.StatusMovedPermanently, originalURL)
 	}

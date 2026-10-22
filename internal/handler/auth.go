@@ -171,7 +171,7 @@ func Login(db *pgxpool.Pool, jwtSecret string) gin.HandlerFunc {
 		// Generate JWT access token
 		claims := jwt.MapClaims{
 			"user_id": id,
-			"exp":     time.Now().Add(24 * time.Hour).Unix(),
+			"exp":     time.Now().Add(60 * time.Minute).Unix(),
 		}
 
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

@@ -16,7 +16,7 @@ func LinkRoutes(router *gin.Engine, db *pgxpool.Pool, jwtSecret string, redisCli
 
 	//protected route
 	protected := router.Group("/api")
-	protected.Use(middleware.Auth(jwtSecret))
+	protected.Use(middleware.Auth(jwtSecret, redisClient))
 
 	protected.POST("/links", handler.CreateLink(db))
 	protected.GET("/links", handler.GetLinks(db))

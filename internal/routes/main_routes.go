@@ -10,9 +10,9 @@ import (
 )
 
 func Setup(router *gin.Engine, db *pgxpool.Pool, jwtSecret string, redisClient *redis.Client) {
-	AuthRoutes(router, db, jwtSecret)
+	AuthRoutes(router, db, jwtSecret, redisClient)
 	LinkRoutes(router, db, jwtSecret, redisClient)
 
-	// Display Swagger UI
+	// Swagger UI
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 }

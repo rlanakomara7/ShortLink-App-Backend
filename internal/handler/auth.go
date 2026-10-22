@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"strings"
 	"time"
@@ -8,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -191,6 +194,74 @@ func Login(db *pgxpool.Pool, jwtSecret string) gin.HandlerFunc {
 			"results": gin.H{
 				"access_token": tokenString,
 			},
+		})
+	}
+}
+
+// Logout godoc
+// @Summary Logout and revoke JWT
+// @Tags Authentication
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Router /api/logout [post]
+func Logout(redisClient *redis.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenString := c.GetString("access_token")
+
+		expiresAt, ok := c.Get("token_expires_at")
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"success": false,
+				"message": "Invalid token",
+			})
+			return
+		}
+
+		expiration, ok := expiresAt.(time.Time)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"success": false,
+				"message": "Invalid token expiration",
+			})
+			return
+		}
+
+		// Match the blacklist key used by middleware
+		hash := sha256.Sum256([]byte(tokenString))
+		tokenHash := hex.EncodeToString(hash[:])
+		cacheKey := "blacklist:" + tokenHash
+
+		// Keep the blacklist entry until JWT expiration
+		ttl := time.Until(expiration)
+
+		if ttl <= 0 {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"success": false,
+				"message": "Token expired",
+			})
+			return
+		}
+
+		err := redisClient.Set(
+			c.Request.Context(),
+			cacheKey,
+			"revoked",
+			ttl,
+		).Err()
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"message": "Failed to logout",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "Logout successful",
 		})
 	}
 }

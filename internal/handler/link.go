@@ -17,6 +17,18 @@ type CreateLinkRequest struct {
 	Slug        string `json:"slug"`
 }
 
+// CreateLink godoc
+// @Summary Create a shortlink
+// @Tags Shortlinks
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body CreateLinkRequest true "Shortlink data"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 409 {object} map[string]interface{}
+// @Router /api/links [post]
 func CreateLink(db *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req CreateLinkRequest
@@ -57,7 +69,6 @@ func CreateLink(db *pgxpool.Pool) gin.HandlerFunc {
 				})
 				return
 			}
-
 			slug = hex.EncodeToString(randomBytes)
 		}
 
@@ -151,6 +162,14 @@ func CreateLink(db *pgxpool.Pool) gin.HandlerFunc {
 	}
 }
 
+// GetLinks godoc
+// @Summary Get current user's shortlinks
+// @Tags Shortlinks
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Router /api/links [get]
 func GetLinks(db *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
@@ -213,6 +232,17 @@ func GetLinks(db *pgxpool.Pool) gin.HandlerFunc {
 	}
 }
 
+// DeleteLink godoc
+// @Summary Delete a shortlink
+// @Tags Shortlinks
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Link ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /api/links/{id} [delete]
 func DeleteLink(db *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Convert link ID to integer
@@ -255,5 +285,35 @@ func DeleteLink(db *pgxpool.Pool) gin.HandlerFunc {
 			"success": true,
 			"message": "Shortlink deleted successfully",
 		})
+	}
+}
+
+// RedirectLink godoc
+// @Summary Redirect to the original URL
+// @Tags Shortlinks
+// @Param slug path string true "Shortlink slug"
+// @Success 301 {string} string "Moved Permanently"
+// @Failure 404 {object} map[string]interface{}
+// @Router /{slug} [get]
+func RedirectLink(db *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		slug := c.Param("slug")
+
+		var originalURL string
+
+		err := db.QueryRow(c.Request.Context(),
+			`SELECT original_url FROM links
+			WHERE slug = $1 AND deleted_at IS NULL`,
+			slug).Scan(&originalURL)
+
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"message": "Shortlink not found",
+			})
+			return
+		}
+
+		c.Redirect(http.StatusMovedPermanently, originalURL)
 	}
 }

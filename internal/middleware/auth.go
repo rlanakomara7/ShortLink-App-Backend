@@ -44,7 +44,6 @@ func Auth(secret string) gin.HandlerFunc {
 			})
 			return
 		}
-
 		c.Set("user_id", int64(userID))
 		c.Next()
 	}

@@ -16,6 +16,16 @@ type RegisterRequest struct {
 	Password string `json:"password" binding:"required,min=8"`
 }
 
+// Register godoc
+// @Summary Register a new user
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param request body RegisterRequest true "Registration data"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 409 {object} map[string]interface{}
+// @Router /api/register [post]
 func Register(db *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req RegisterRequest
@@ -101,6 +111,16 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+// Login godoc
+// @Summary Login and get JWT access token
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param request body LoginRequest true "Login data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Router /api/login [post]
 func Login(db *pgxpool.Pool, jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req LoginRequest

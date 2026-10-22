@@ -9,10 +9,17 @@ import (
 )
 
 func LinkRoutes(router *gin.Engine, db *pgxpool.Pool, jwtSecret string) {
+
+	//public route
+	router.GET("/:slug", handler.RedirectLink(db))
+
+	//protected route
 	protected := router.Group("/api")
 	protected.Use(middleware.Auth(jwtSecret))
 
 	protected.POST("/links", handler.CreateLink(db))
 	protected.GET("/links", handler.GetLinks(db))
 	protected.DELETE("/links/:id", handler.DeleteLink(db))
+	protected.GET("/profile", handler.GetProfile(db))
+
 }

@@ -1,221 +1,179 @@
-# SHORTLINK API
+# SHORTLINK APP API
 
-![Go](https://img.shields.io/badge/Go-Backend-00ADD8?style=for-the-badge&logo=go&logoColor=white)
-![Gin](https://img.shields.io/badge/Gin-Framework-008ECF?style=for-the-badge)
+![Go](https://img.shields.io/badge/Go-1.27.1-00ADD8?style=for-the-badge&logo=go&logoColor=white)
+![Gin](https://img.shields.io/badge/Gin-1.12.0-008ECF?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white)
 ![Swagger](https://img.shields.io/badge/Swagger-Swaggo-85EA2D?style=for-the-badge&logo=swagger&logoColor=black)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
-A RESTful URL shortening API built with **Go** and **Gin** for the **ShortLink App** project. The backend provides account authentication, shortlink creation and management, public redirects, and basic account information. **PostgreSQL** stores user and link data persistently, while **Redis** caches shortlink destinations to speed up redirects. This API serves a separate React frontend.
+A URL shortener REST API built with **Go** and **Gin**. It provides user authentication, shortlink management, and URL redirection, using **PostgreSQL** for data storage and **Redis** for caching.
 
 ## Technologies
 
-- **Go** — Backend programming language (see the exact version in `go.mod`).
-- **Gin** — Routing, JSON request binding, and HTTP middleware.
-- **PostgreSQL 16 / pgx v5** — Persistent data storage and connection pooling.
-- **Redis 7 / go-redis v9** — Temporary caching of shortlink redirect destinations.
-- **JWT** — Bearer-token authentication for protected routes; newly issued tokens expire after 60 minutes.
-- **bcrypt** — Password hashing.
-- **Swaggo / Swagger UI** — Interactive API documentation.
-- **Docker Compose** — Local PostgreSQL and Redis services.
-- **Air** — Optional hot reload during backend development.
+- **Go & Gin** — REST API.
+- **PostgreSQL & pgx/v5** — Database and connection pooling.
+- **Redis (go-redis/v9)** — Redirect caching; JWT blacklist for logout when the logout feature is merged.
+- **JWT & bcrypt** — Authentication and password hashing.
+- **Swagger** — API documentation.
+- **Docker Compose** — PostgreSQL and Redis services.
 
 ## Features
 
-- User registration and login.
-- JWT-protected endpoints.
-- Create shortlinks with an optional custom slug or a generated slug.
-- List active shortlinks owned by the authenticated user.
-- Soft-delete owned shortlinks.
-- Public HTTP `301` redirect from a short slug to its original URL.
-- Redis redirect caching with a 10-minute TTL; cache invalidation on deletion.
-- Retrieve the authenticated user's email and account creation date.
-- Swagger documentation for API exploration.
-
-**Scope:** This backend does not currently provide click analytics, team workspaces, QR generation, password reset, or server-side avatar uploads. The frontend stores profile photos locally in the browser.
+- Register and login with JWT access tokens (60-minute expiry).
+- Create shortlinks with automatic or custom slugs.
+- View and delete your own links (soft delete).
+- Redirect shortlinks with Redis caching.
+- View basic account profile information.
+- Logout with Redis JWT blacklist **(implemented locally; verify/push before marking as released)**.
 
 ## Getting Started
 
 ### Prerequisites
 
-- Git.
-- Go (compatible with the version in `go.mod`).
-- Docker with Docker Compose.
-- PostgreSQL command-line access through `docker exec` for applying the initial SQL migration.
-- Optional: Air for development hot reload; Swaggo CLI to regenerate docs.
+Install **Go**, **Docker**, **Git**, and **Node.js/npm** for the separate frontend project.
 
-The development setup runs the Go API in **WSL**, PostgreSQL and Redis in **Docker**, and the React frontend separately on Windows. Local defaults used in this project:
-
-| Service                     | Address                 |
-| --------------------------- | ----------------------- |
-| Backend API                 | `http://localhost:8080` |
-| PostgreSQL host connection  | `127.0.0.1:5433`        |
-| Redis host connection       | `127.0.0.1:6379`        |
-| Frontend development server | `http://localhost:5173` |
-
-### Clone the repository
+### 1. Clone the backend
 
 ```bash
 git clone https://github.com/rlanakomara7/ShortLink-App-Backend.git
 cd ShortLink-App-Backend
 ```
 
-### Configure environment variables
+### 2. Configure environment variables
 
-Copy the template and fill in your own credentials:
+Copy `.env.example` to `.env` and complete it:
 
 ```bash
 cp .env.example .env
 ```
-
-Use the variable names **as defined in this repository's `.env.example` and `internal/config/config.go`**. The configuration includes PostgreSQL connection settings, the API port, and `JWT_SECRET`. Docker Compose also reads its PostgreSQL variables from the environment. Make sure the PostgreSQL credentials match those configured in the database.
-
-Example placeholders (check the actual template before copying keys):
 
 ```dotenv
 POSTGRES_USER=shortlink
 POSTGRES_PASSWORD=replace_with_a_strong_password
 POSTGRES_DB=shortlink_db
 POSTGRES_PORT=5433
-JWT_SECRET=replace_with_a_long_random_secret
+
+APP_PORT=8080
+DB_HOST=localhost
+DB_PORT=5433
+DB_USER=shortlink
+DB_PASSWORD=replace_with_the_same_strong_password
+DB_NAME=shortlink_db
+DB_SSLMODE=disable
+JWT_SECRET=replace_with_a_random_secret_of_at_least_32_characters
 ```
 
-Do not commit `.env`, real credentials, or access tokens. **If a secret was previously committed to GitHub, rotate it and clean the affected Git history; adding `.env` to `.gitignore` alone is not sufficient.**
+Use the **same password** for `POSTGRES_PASSWORD` and `DB_PASSWORD`. Do not commit `.env`.
 
-### Start PostgreSQL and Redis
-
-From the backend root in WSL:
+### 3. Start PostgreSQL and Redis
 
 ```bash
-docker compose config --quiet
 docker compose up -d db redis
 ```
 
-Verify Redis:
+### 4. Database setup and migrations
 
-```bash
-docker exec shortlink-redis redis-cli ping
+On a **new database**, Docker Compose creates `shortlink_db` from `POSTGRES_DB`. The schema is maintained in separate UP/DOWN files:
+
+```text
+migrations/
+├── 000001_create_users.up.sql
+├── 000001_create_users.down.sql
+├── 000002_create_links.up.sql
+└── 000002_create_links.down.sql
 ```
 
-Expected output: `PONG`.
+```sql
+CREATE TABLE users (
+    id BIGSERIAL PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-### Apply the initial migration
-
-The initial schema is in `migrations/001_init.sql` and creates the `users` and `links` tables with their constraints and indexes.
-
-For a **new, empty** development database, apply it once:
-
-```bash
-docker exec -i shortlink-postgres psql -v ON_ERROR_STOP=1 -U shortlink -d shortlink_db < migrations/001_init.sql
+CREATE UNIQUE INDEX idx_users_email_unique ON users (LOWER(email));
 ```
 
-Adjust the database user, database name, and container name if you changed them. **Do not rerun the migration blindly on a database that already contains tables or data.** This project does not currently include a versioned migration runner or automatic rollback workflow.
+The Links migration creates its table and index:
 
-Verify the tables:
+```sql
+CREATE TABLE links (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    original_url TEXT NOT NULL,
+    slug VARCHAR(50) NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ,
+    CONSTRAINT chk_slug_format CHECK (slug ~ '^[A-Za-z0-9-]{3,50}$'),
+    CONSTRAINT chk_slug_reserved CHECK (
+        LOWER(slug) NOT IN ('api', 'login', 'register', 'dashboard')
+    )
+);
 
-```bash
-docker exec shortlink-postgres psql -U shortlink -d shortlink_db -c '\dt'
+CREATE INDEX idx_links_user_id ON links(user_id);
 ```
 
-### Run the backend
+Run **UP in order** from the backend root (WSL/Linux shell):
 
-Install module dependencies:
+```bash
+docker exec -i shortlink-postgres psql -v ON_ERROR_STOP=1 -U shortlink -d shortlink_db < migrations/000001_create_users.up.sql
+docker exec -i shortlink-postgres psql -v ON_ERROR_STOP=1 -U shortlink -d shortlink_db < migrations/000002_create_links.up.sql
+```
+
+Rollback runs **DOWN in reverse order** (`links` before `users`), but **DOWN deletes tables and their data**. Never run it on a database containing data you want to keep. If your database has already been initialized, do **not** run these UP commands again.
+
+### 5. Run the backend
 
 ```bash
 go mod download
-```
-
-Run directly:
-
-```bash
 go run ./cmd/api
 ```
 
-Or use Air if installed:
+API: `http://localhost:8080`  
+Swagger UI: `http://localhost:8080/swagger/index.html`
+
+### 6. Run the frontend
+
+Clone the **separate ShortLink App Frontend repository**, then run from its root:
 
 ```bash
-air
+npm install
+npm run dev
 ```
 
-The application connects to PostgreSQL and Redis during startup and listens on the configured API port (typically `8080`). Keep both services running for this configuration.
+Vite normally serves the frontend at `http://localhost:5173`. Its `/api` proxy should point to the backend on port `8080`.
 
 ## API Endpoints
 
-| Method   | Endpoint              | Authentication | Description                                |
-| -------- | --------------------- | -------------- | ------------------------------------------ |
-| `POST`   | `/api/register`       | Public         | Create an account                          |
-| `POST`   | `/api/login`          | Public         | Authenticate and receive a JWT             |
-| `POST`   | `/api/links`          | Bearer JWT     | Create a shortlink                         |
-| `GET`    | `/api/links`          | Bearer JWT     | List the current user's active shortlinks  |
-| `DELETE` | `/api/links/:id`      | Bearer JWT     | Soft-delete an owned shortlink             |
-| `GET`    | `/api/profile`        | Bearer JWT     | Read account email and creation date       |
-| `GET`    | `/:slug`              | Public         | Redirect to an active original URL (`301`) |
-| `GET`    | `/swagger/index.html` | Public         | Swagger UI                                 |
+| Method | Endpoint         | Description                   | Auth |
+| ------ | ---------------- | ----------------------------- | ---- |
+| POST   | `/api/register`  | Register an account           | No   |
+| POST   | `/api/login`     | Login and get an access token | No   |
+| POST   | `/api/logout`    | Revoke current JWT via Redis  | Yes  |
+| GET    | `/api/profile`   | Get current profile           | Yes  |
+| POST   | `/api/links`     | Create a shortlink            | Yes  |
+| GET    | `/api/links`     | List your shortlinks          | Yes  |
+| DELETE | `/api/links/:id` | Soft-delete a shortlink       | Yes  |
+| GET    | `/:slug`         | Redirect to original URL      | No   |
 
-Example protected request (replace the placeholder locally):
+For protected endpoints, send `Authorization: Bearer <access_token>`.
 
-```bash
-curl -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' http://localhost:8080/api/links
-```
-
-### Redis redirect cache
-
-The public redirect handler looks up a key named `shortlink:<slug>`:
-
-1. If the key exists, use the cached destination URL.
-2. Otherwise, look up the active link in PostgreSQL and cache its destination for 10 minutes.
-3. When a link is soft-deleted, invalidate its Redis key so the deleted link cannot redirect from stale cache.
-
-Inspect a test cache entry:
+## Useful Commands
 
 ```bash
-docker exec shortlink-redis redis-cli GET shortlink:YOUR_SLUG
-docker exec shortlink-redis redis-cli TTL shortlink:YOUR_SLUG
+go build ./...           # Check that the backend compiles
+go test ./...            # Run available tests
+docker compose up -d     # Start services
+docker compose down      # Stop services without deleting the data volume
 ```
 
-Redis is a cache, **not** the authoritative source for user or shortlink data.
+**Security:** Never commit `.env` or actual credentials. Keep the `shortlink_pgdata` Docker volume if you want to preserve database records.
 
-## Swagger API Documentation
+## Related Project
 
-Once the server starts, open:
+- **Frontend:** ShortLink App Frontend [(separate repository; add the verified GitHub URL here)](https://github.com/rlanakomara7/ShortLink-App-Frontend.git).
 
-**http://localhost:8080/swagger/index.html**
+## License
 
-If you change handler annotations or add endpoints (such as `/api/profile`), regenerate the checked-in Swagger documentation using the installed Swaggo CLI. With this project layout, the entrypoint is `cmd/api/main.go`:
-
-```bash
-swag init -g cmd/api/main.go --parseDependency --parseInternal
-```
-
-Review generated changes in `docs/` before committing. Use Swagger's Authorize feature for protected routes; never commit a real JWT.
-
-## Development Commands
-
-| Command                                      | Description                                  |
-| -------------------------------------------- | -------------------------------------------- |
-| `docker compose up -d db redis`              | Start PostgreSQL and Redis                   |
-| `docker compose ps`                          | Inspect service status                       |
-| `go mod download`                            | Download dependencies                        |
-| `go run ./cmd/api`                           | Start API directly                           |
-| `air`                                        | Run with hot reload, if installed            |
-| `go build ./...`                             | Compile all Go packages                      |
-| `go test ./...`                              | Run available Go tests                       |
-| `docker exec shortlink-redis redis-cli ping` | Check Redis connectivity                     |
-| `docker compose down`                        | Stop the stack while retaining named volumes |
-
-**Warning:** Avoid `docker compose down -v` unless you deliberately want to remove database volumes and their data.
-
-## Data Persistence and Security Notes
-
-- PostgreSQL data is persisted in the Docker named volume configured in `compose.yaml`.
-- Redis cache entries are temporary and have a limited TTL.
-- Passwords are stored as bcrypt hashes, not plaintext.
-- JWTs protect user-specific operations; the frontend currently stores the token in browser local storage.
-- Account photos are browser-local and are not uploaded to this backend.
-- An expired or invalid JWT requires the user to sign in again.
-- Before a public deployment, review secret management, HTTPS, trusted proxy configuration, API error handling, and redirect-cache consistency.
-
-## Related Repository
-
-- **Frontend:** [Separate React/Vite repository (add its verified GitHub URL here).](https://github.com/rlanakomara7/ShortLink-App-Frontend.git)
+No license is declared here until a `LICENSE` file is added to the repository. If MIT is chosen, add the MIT license file first.

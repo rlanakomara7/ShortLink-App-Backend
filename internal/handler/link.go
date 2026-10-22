@@ -180,10 +180,10 @@ func GetLinks(db *pgxpool.Pool) gin.HandlerFunc {
 
 		rows, err := db.Query(
 			c.Request.Context(),
-			`SELECT id, original_url, slug
-			 FROM links
-			 WHERE user_id = $1 AND deleted_at IS NULL
-			 ORDER BY created_at DESC, id DESC`,
+			`SELECT id, original_url, slug, created_at
+     		FROM links
+     		WHERE user_id = $1 AND deleted_at IS NULL
+     		ORDER BY created_at DESC`,
 			userID,
 		)
 
@@ -202,8 +202,9 @@ func GetLinks(db *pgxpool.Pool) gin.HandlerFunc {
 			var id int64
 			var originalURL string
 			var slug string
+			var createdAt time.Time
 
-			if err := rows.Scan(&id, &originalURL, &slug); err != nil {
+			if err := rows.Scan(&id, &originalURL, &slug, &createdAt); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{
 					"success": false,
 					"message": "Failed to read links",
@@ -216,6 +217,7 @@ func GetLinks(db *pgxpool.Pool) gin.HandlerFunc {
 				"original_url": originalURL,
 				"slug":         slug,
 				"short_url":    "http://" + c.Request.Host + "/" + slug,
+				"created_at":   createdAt,
 			})
 		}
 
@@ -298,7 +300,6 @@ func DeleteLink(db *pgxpool.Pool) gin.HandlerFunc {
 // @Success 301 {string} string "Moved Permanently"
 // @Failure 404 {object} map[string]interface{}
 // @Router /{slug} [get]
-
 func RedirectLink(db *pgxpool.Pool, redisClient *redis.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		slug := c.Param("slug")

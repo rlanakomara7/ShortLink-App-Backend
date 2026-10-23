@@ -69,7 +69,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handler.CreateLinkRequest"
+                            "$ref": "#/definitions/internal_handler.CreateLinkRequest"
                         }
                     }
                 ],
@@ -179,7 +179,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handler.LoginRequest"
+                            "$ref": "#/definitions/internal_handler.LoginRequest"
                         }
                     }
                 ],
@@ -208,6 +208,82 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/logout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Revoke the current JWT access token using Redis blacklist",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Logout user",
+                "responses": {
+                    "200": {
+                        "description": "Logout successful",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized or revoked token",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to logout or Redis unavailable",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/profile": {
+            "get": {
+                "description": "Get the authenticated user's email and registration date",
+                "produces": [
+                    "application/json",
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile",
+                    "Profile"
+                ],
+                "summary": "Get user profile",
+                "responses": {
+                    "200": {
+                        "description": "Profile retrieved successfully",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler.ProfileResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to load profile",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/register": {
             "post": {
                 "consumes": [
@@ -227,7 +303,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handler.RegisterRequest"
+                            "$ref": "#/definitions/internal_handler.RegisterRequest"
                         }
                     }
                 ],
@@ -290,7 +366,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "handler.CreateLinkRequest": {
+        "internal_handler.CreateLinkRequest": {
             "type": "object",
             "required": [
                 "original_url"
@@ -304,7 +380,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handler.LoginRequest": {
+        "internal_handler.LoginRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -319,7 +395,32 @@ const docTemplate = `{
                 }
             }
         },
-        "handler.RegisterRequest": {
+        "internal_handler.ProfileData": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-10-22"
+                },
+                "email": {
+                    "type": "string",
+                    "example": "rama@gmail.com"
+                }
+            }
+        },
+        "internal_handler.ProfileResponse": {
+            "type": "object",
+            "properties": {
+                "results": {
+                    "$ref": "#/definitions/internal_handler.ProfileData"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "internal_handler.RegisterRequest": {
             "type": "object",
             "required": [
                 "email",

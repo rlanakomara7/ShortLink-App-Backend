@@ -199,12 +199,14 @@ func Login(db *pgxpool.Pool, jwtSecret string) gin.HandlerFunc {
 }
 
 // Logout godoc
-// @Summary Logout and revoke JWT
+// @Summary Logout user
+// @Description Revoke the current JWT access token using Redis blacklist
 // @Tags Authentication
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} map[string]interface{}
-// @Failure 401 {object} map[string]interface{}
+// @Success 200 {object} map[string]interface{} "Logout successful"
+// @Failure 401 {object} map[string]interface{} "Unauthorized or revoked token"
+// @Failure 500 {object} map[string]interface{} "Failed to logout or Redis unavailable"
 // @Router /api/logout [post]
 func Logout(redisClient *redis.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {

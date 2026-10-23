@@ -250,13 +250,16 @@ const docTemplate = `{
         },
         "/api/profile": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get the authenticated user's email and registration date",
                 "produces": [
-                    "application/json",
                     "application/json"
                 ],
                 "tags": [
-                    "Profile",
                     "Profile"
                 ],
                 "summary": "Get user profile",

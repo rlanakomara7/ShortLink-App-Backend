@@ -17,13 +17,12 @@ type ProfileResponse struct {
 	Results ProfileData `json:"results"`
 }
 
-// GetProfile Godoc
+// GetProfile godoc
 // @Summary Get user profile
 // @Description Get the authenticated user's email and registration date
 // @Tags Profile
 // @Produce json
-// @Tags Profile
-// @Produce json
+// @Security BearerAuth
 // @Success 200 {object} ProfileResponse "Profile retrieved successfully"
 // @Failure 401 {object} map[string]interface{} "Unauthorized"
 // @Failure 500 {object} map[string]interface{} "Failed to load profile"
